@@ -1,0 +1,773 @@
+
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: #050505;
+    overflow: hidden;
+  }
+  #zroot {
+    width:100%;
+    height:100%;
+    min-height:100vh;
+    background:#050505;
+    display:flex;
+    font-family:'Courier New',monospace;
+    overflow:hidden;
+    position:relative;
+  }
+  #chat-panel {
+    flex:0 0 300px;
+    width:300px;
+    min-width:280px;
+    max-width:320px;
+    height:100%;
+    background:#050505;
+    border-right:1px solid #121212;
+    display:flex;
+    flex-direction:column;
+    padding:12px 10px;
+    z-index:1;
+    position:relative;
+    overflow:hidden;
+  }
+  .chat-title {
+    font-size:8px;
+    letter-spacing:3px;
+    color:#5b5b5b;
+    text-transform:uppercase;
+    border-bottom:1px solid #1a1a1a;
+    padding-bottom:6px;
+    margin-bottom:8px;
+  }
+  #chat-log {
+    flex:1;
+    overflow-y:auto;
+    overflow-x:hidden;
+    font-family:'Courier New',monospace;
+    font-size:11px;
+    line-height:1.35;
+    padding-right:4px;
+    contain:content;
+  }
+  #chat-log::-webkit-scrollbar { width:6px; }
+  #chat-log::-webkit-scrollbar-track { background:#070707; }
+  #chat-log::-webkit-scrollbar-thumb {
+    background:#1d5f80;
+    border-radius:10px;
+    border:1px solid #0b0b0b;
+  }
+  #chat-log {
+    scrollbar-width:thin;
+    scrollbar-color:#1d5f80 #070707;
+  }
+  .chat-line {
+    white-space:pre-wrap;
+    word-break:break-word;
+    margin-bottom:2px;
+  }
+  .chat-user { color:#d8d8d8; }
+  .chat-zenith { color:#4ec8ff; }
+  .chat-system { color:#e7d57f; }
+  .chat-error { color:#ff5d5d; }
+  #bg-particles { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; }
+  #main { flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; padding:1.5rem 1rem; z-index:1; }
+  #orb-canvas { display:block; margin-bottom:1rem; }
+  .z-mode-label { font-size:9px; letter-spacing:4px; margin-bottom:.8rem; transition:color .6s; }
+  .z-name { font-size:18px; letter-spacing:8px; font-weight:300; margin-bottom:4px; transition:color .6s; }
+  .z-sub { font-size:9px; letter-spacing:3px; opacity:.35; margin-bottom:1.2rem; }
+  #panel { width:220px; min-height:100%; background:rgba(8,8,8,0.9); border-left:1px solid #1a1a1a; display:flex; flex-direction:column; padding:12px 10px; gap:10px; overflow-x:hidden; overflow-y:auto; z-index:1; position:relative; }
+  .p-section { border:1px solid #1a1a1a; padding:8px 10px; background:#0a0a0a; }
+  .p-title { font-size:8px; letter-spacing:3px; color:#444; margin-bottom:8px; text-transform:uppercase; border-bottom:1px solid #1a1a1a; padding-bottom:5px; }
+  .stat-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; }
+  .stat-key { font-size:8px; color:#444; letter-spacing:1px; }
+  .stat-val { font-size:9px; font-weight:bold; letter-spacing:1px; }
+  .bar-wrap { height:3px; background:#111; border-radius:1px; margin-bottom:6px; }
+  .bar-fill { height:100%; border-radius:1px; transition:width .8s ease; }
+  .chart-wrap { height:48px; }
+  .gauge-wrap { display:flex; flex-direction:column; align-items:center; }
+  .gauge-num { font-size:20px; font-weight:bold; letter-spacing:2px; margin-top:2px; }
+  .gauge-sub { font-size:7px; color:#444; letter-spacing:2px; margin-top:2px; }
+  .dot-grid { display:flex; flex-wrap:wrap; gap:3px; }
+  .dot { width:6px; height:6px; border-radius:50%; background:#1a1a1a; transition:all .4s; }
+  #mic-visualizer { width:190px; height:62px; display:block; background:#060606; border:1px solid #121212; border-radius:3px; }
+  .mic-note { margin-top:6px; font-size:8px; letter-spacing:1px; color:#3d3d3d; text-transform:uppercase; }
+  .log-line { font-size:7px; color:#333; letter-spacing:1px; margin-bottom:3px; white-space:nowrap; overflow:hidden; }
+  .log-line.new { color:#c084fc; }
+</style>
+
+<div id="zroot">
+  <canvas id="bg-particles"></canvas>
+  <div id="chat-panel">
+    <div class="chat-title">TERMINAL · CHAT LOG</div>
+    <div id="chat-log"></div>
+  </div>
+  <div id="main">
+    <div class="z-mode-label" id="mlabel" style="color:#aaa">— IDLE —</div>
+    <canvas id="orb-canvas" width="220" height="220"></canvas>
+    <div class="z-name" id="zname" style="color:#aaa">ZENITH</div>
+    <div class="z-sub" style="color:#aaa">VARYN · PERSONAL AI SYSTEM</div>
+  </div>
+  <div id="panel">
+    <div class="p-section">
+      <div class="p-title">SYS · STATUS</div>
+      <div class="stat-row"><span class="stat-key">CPU</span><span class="stat-val" id="s-cpu" style="color:#c084fc">--</span></div>
+      <div class="bar-wrap"><div class="bar-fill" id="b-cpu" style="width:0%;background:#c084fc"></div></div>
+      <div class="stat-row"><span class="stat-key">RAM</span><span class="stat-val" id="s-ram" style="color:#818cf8">--</span></div>
+      <div class="bar-wrap"><div class="bar-fill" id="b-ram" style="width:0%;background:#818cf8"></div></div>
+      <div class="stat-row"><span class="stat-key">GPU</span><span class="stat-val" id="s-gpu" style="color:#a78bfa">--</span></div>
+      <div class="bar-wrap"><div class="bar-fill" id="b-gpu" style="width:0%;background:#a78bfa"></div></div>
+      <div class="stat-row"><span class="stat-key">VRAM</span><span class="stat-val" id="s-vram" style="color:#7c3aed">--</span></div>
+      <div class="bar-wrap" style="margin-bottom:0"><div class="bar-fill" id="b-vram" style="width:0%;background:#7c3aed"></div></div>
+    </div>
+    <div class="p-section">
+      <div class="p-title">INTENT · HISTORY</div>
+      <div class="chart-wrap"><canvas id="chart-intent" width="190" height="48"></canvas></div>
+    </div>
+    <div class="p-section">
+      <div class="gauge-wrap">
+        <div class="p-title" style="width:100%;text-align:center">CONFIDENCE</div>
+        <canvas id="gauge" width="120" height="70"></canvas>
+        <div class="gauge-num" id="conf-num" style="color:#c084fc">0.00</div>
+        <div class="gauge-sub">INTENT · SCORE</div>
+      </div>
+    </div>
+    <div class="p-section">
+      <div class="p-title">MIC · INPUT</div>
+      <canvas id="mic-visualizer" width="190" height="62"></canvas>
+      <div class="mic-note" id="mic-status">Awaiting microphone access...</div>
+    </div>
+    <div class="p-section" style="flex:1">
+      <div class="p-title">SYS · LOG</div>
+      <div id="logbox"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const MODES = {
+  idle:   { color:'#aaaaaa', pc:[160,160,160], label:'— IDLE —',      speedX:0.002, speedY:0.004, distort:0,    morphAmp:0, pulseAmp:0,     pulseSpeed:0 },
+  listen: { color:'#4a9eff', pc:[40,120,255],  label:'— LISTENING —', speedX:0.004, speedY:0.012, distort:0.09, morphAmp:0, pulseAmp:0,     pulseSpeed:0 },
+  think:  { color:'#c084fc', pc:[160,80,252],  label:'— THINKING —',  speedX:0.011, speedY:0.006, distort:0.04, morphAmp:0, pulseAmp:0,     pulseSpeed:0 },
+  speak:  { color:'#ff3333', pc:[255,40,40],   label:'— SPEAKING —',  speedX:0.003, speedY:0.007, distort:0,    morphAmp:1, pulseAmp:0.055, pulseSpeed:0.28 }
+};
+let mode = 'idle';
+
+const PARTICLE_BEHAVIOR = {
+  idle:   { speed:0.45, jitter:0.004, gravity:0.012, converge:0.006, vortex:0.000, burst:0.000, maxSpeed:0.8 },
+  listen: { speed:0.90, jitter:0.008, gravity:0.020, converge:0.030, vortex:0.004, burst:0.000, maxSpeed:1.7 },
+  think:  { speed:1.35, jitter:0.020, gravity:0.017, converge:0.015, vortex:0.055, burst:0.000, maxSpeed:3.0 },
+  speak:  { speed:1.00, jitter:0.010, gravity:0.014, converge:0.008, vortex:0.012, burst:0.095, maxSpeed:2.3 }
+};
+
+const ZROOT = document.getElementById('zroot');
+const BGC = document.getElementById('bg-particles');
+const bgctx = BGC.getContext('2d');
+const STAR_COUNT_MIN = 85;
+const STAR_DENSITY = 18000;
+const STAR_DEPTH_MIN = 0.65;
+const STAR_DEPTH_MAX = 1.35;
+let stars = [];
+let bgW = 0;
+let bgH = 0;
+let bgTick = 0;
+let burstEnergy = 0;
+let burstCooldown = 0;
+
+const OC = document.getElementById('orb-canvas');
+const octx = OC.getContext('2d');
+const CX = 110, CY = 110, R = 80;
+const N = 3200;
+let pts = [];
+let rotX = 0, rotY = 0;
+let tick = 0;
+
+function getOrbCenterInRoot() {
+  const rootRect = ZROOT.getBoundingClientRect();
+  const orbRect = OC.getBoundingClientRect();
+  return {
+    x: orbRect.left - rootRect.left + orbRect.width / 2,
+    y: orbRect.top - rootRect.top + orbRect.height / 2
+  };
+}
+
+function makeStar(x, y) {
+  const depth = STAR_DEPTH_MIN + Math.random() * (STAR_DEPTH_MAX - STAR_DEPTH_MIN);
+  return {
+    x: typeof x === 'number' ? x : Math.random() * bgW,
+    y: typeof y === 'number' ? y : Math.random() * bgH,
+    vx: (Math.random() - 0.5) * 0.24 * depth,
+    vy: (Math.random() - 0.5) * 0.24 * depth,
+    r: Math.random() * 1.6 + 0.25,
+    o: Math.random() * 0.45 + 0.15,
+    phase: Math.random() * Math.PI * 2,
+    depth
+  };
+}
+
+function desiredStarCount() {
+  return Math.max(STAR_COUNT_MIN, Math.floor((bgW * bgH) / STAR_DENSITY));
+}
+
+function resizeParticleCanvas() {
+  const width = Math.max(1, Math.floor(ZROOT.clientWidth));
+  const height = Math.max(1, Math.floor(ZROOT.clientHeight));
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  bgW = width;
+  bgH = height;
+  BGC.width = Math.floor(width * dpr);
+  BGC.height = Math.floor(height * dpr);
+  bgctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function initParticles() {
+  stars = [];
+  const count = desiredStarCount();
+  const cols = Math.max(1, Math.ceil(Math.sqrt((count * bgW) / Math.max(bgH, 1))));
+  const rows = Math.max(1, Math.ceil(count / cols));
+  const cellW = bgW / cols;
+  const cellH = bgH / rows;
+
+  for (let i = 0; i < count; i++) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = col * cellW + cellW * 0.5 + (Math.random() - 0.5) * cellW * 0.85;
+    const y = row * cellH + cellH * 0.5 + (Math.random() - 0.5) * cellH * 0.85;
+    stars.push(makeStar(Math.min(Math.max(x, 0), bgW), Math.min(Math.max(y, 0), bgH)));
+  }
+}
+
+function syncParticleDensity() {
+  const target = desiredStarCount();
+  if (stars.length !== target) {
+    initParticles();
+    return;
+  }
+
+  for (let i = 0; i < stars.length; i++) {
+    const p = stars[i];
+    if (p.x < 0) p.x = 0;
+    if (p.x > bgW) p.x = bgW;
+    if (p.y < 0) p.y = 0;
+    if (p.y > bgH) p.y = bgH;
+  }
+}
+
+function triggerBurst(power) {
+  burstEnergy = Math.min(1.5, burstEnergy + power);
+}
+
+function animateParticles() {
+  bgTick++;
+  const cfg = PARTICLE_BEHAVIOR[mode];
+  const [cr, cg, cb] = MODES[mode].pc;
+  const center = getOrbCenterInRoot();
+
+  bgctx.clearRect(0, 0, bgW, bgH);
+
+  const haloRadius = Math.max(bgW, bgH) * 0.55;
+  const halo = bgctx.createRadialGradient(center.x, center.y, 0, center.x, center.y, haloRadius);
+  halo.addColorStop(0, `rgba(${cr},${cg},${cb},0.08)`);
+  halo.addColorStop(1, 'rgba(0,0,0,0)');
+  bgctx.fillStyle = halo;
+  bgctx.fillRect(0, 0, bgW, bgH);
+
+  if (mode === 'speak') {
+    burstCooldown--;
+    if (burstCooldown <= 0) {
+      triggerBurst(0.55);
+      burstCooldown = 35 + Math.floor(Math.random() * 20);
+    }
+  }
+
+  for (let i = 0; i < stars.length; i++) {
+    const p = stars[i];
+    const depthSpeed = p.depth || 1;
+    const depthPull = 1 / depthSpeed;
+    const dx = center.x - p.x;
+    const dy = center.y - p.y;
+    const dist = Math.hypot(dx, dy) + 0.001;
+    const nx = dx / dist;
+    const ny = dy / dist;
+    const tx = -ny;
+    const ty = nx;
+
+    const gravityForce = (cfg.gravity * depthPull) / (1 + dist * 0.018);
+    p.vx += nx * gravityForce;
+    p.vy += ny * gravityForce;
+
+    if (mode === 'listen') {
+      p.vx += nx * cfg.converge;
+      p.vy += ny * cfg.converge;
+    } else if (mode === 'think') {
+      const vortexForce = cfg.vortex * (0.35 + Math.min(1, 250 / (dist + 1)));
+      p.vx += tx * vortexForce;
+      p.vy += ty * vortexForce;
+      p.vx += nx * cfg.converge;
+      p.vy += ny * cfg.converge;
+    } else if (mode === 'speak' && burstEnergy > 0.002) {
+      const burstForce = cfg.burst * burstEnergy;
+      p.vx -= nx * burstForce;
+      p.vy -= ny * burstForce;
+      const twist = cfg.vortex * burstEnergy;
+      p.vx += tx * twist;
+      p.vy += ty * twist;
+    }
+
+    p.vx += (Math.random() - 0.5) * cfg.jitter;
+    p.vy += (Math.random() - 0.5) * cfg.jitter;
+    p.vx *= 0.992;
+    p.vy *= 0.992;
+
+    const speed = Math.hypot(p.vx, p.vy);
+    if (speed > cfg.maxSpeed) {
+      const f = cfg.maxSpeed / speed;
+      p.vx *= f;
+      p.vy *= f;
+    }
+
+    p.x += p.vx * cfg.speed * depthSpeed;
+    p.y += p.vy * cfg.speed * depthSpeed;
+
+    if (p.x < -6) p.x = bgW + 6;
+    if (p.x > bgW + 6) p.x = -6;
+    if (p.y < -6) p.y = bgH + 6;
+    if (p.y > bgH + 6) p.y = -6;
+
+    const twinkle = 0.55 + 0.45 * Math.sin(bgTick * 0.03 + p.phase);
+    const alphaBoost = mode === 'speak' ? 1 + burstEnergy * 0.7 : 1;
+    const alpha = Math.min(0.95, p.o * twinkle * (0.6 + depthSpeed * 0.35) * alphaBoost);
+    const sizePulse = mode === 'think' ? 1 + Math.sin(bgTick * 0.05 + p.phase) * 0.16 : 1;
+
+    bgctx.beginPath();
+    bgctx.arc(p.x, p.y, Math.max(0.2, p.r * sizePulse * depthSpeed), 0, Math.PI * 2);
+    bgctx.fillStyle = `rgba(${cr},${cg},${cb},${alpha.toFixed(3)})`;
+    bgctx.fill();
+  }
+
+  burstEnergy *= mode === 'speak' ? 0.965 : 0.9;
+  if (burstEnergy < 0.001) burstEnergy = 0;
+
+  requestAnimationFrame(animateParticles);
+}
+
+// Simplex-like noise using sin harmonics
+function noise3(x, y, z, t) {
+  return (
+    Math.sin(x * 2.1 + t * 0.7) * 0.4 +
+    Math.sin(y * 1.7 + t * 0.5) * 0.35 +
+    Math.sin(z * 2.3 + t * 0.9) * 0.25 +
+    Math.sin((x + y) * 1.3 + t * 0.4) * 0.2 +
+    Math.sin((y + z) * 1.9 + t * 0.6) * 0.15 +
+    Math.sin((x + z) * 2.5 + t * 0.3) * 0.1
+  );
+}
+
+function mkSphere() {
+  pts = [];
+  for (let i = 0; i < N; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const r = R * (0.9 + Math.random() * 0.18);
+    pts.push({
+      ox: r * Math.sin(phi) * Math.cos(theta),
+      oy: r * Math.sin(phi) * Math.sin(theta),
+      oz: r * Math.cos(phi),
+      nx: Math.random() * 10,
+      ny: Math.random() * 10,
+      nz: Math.random() * 10,
+      size: Math.random() * 1.5 + 0.3,
+      o: Math.random() * 0.5 + 0.3,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+function rotate(x, y, z, ax, ay) {
+  let x1 = x * Math.cos(ay) - z * Math.sin(ay);
+  let z1 = x * Math.sin(ay) + z * Math.cos(ay);
+  let y1 = y * Math.cos(ax) - z1 * Math.sin(ax);
+  let z2 = y * Math.sin(ax) + z1 * Math.cos(ax);
+  return { x: x1, y: y1, z: z2 };
+}
+
+function project(x, y, z) {
+  const fov = 340;
+  const scale = fov / (fov + z + 30);
+  return { px: CX + x * scale, py: CY + y * scale, scale };
+}
+
+function drawSphere() {
+  tick++;
+  octx.clearRect(0, 0, 220, 220);
+
+  const cfg = MODES[mode];
+  rotX += cfg.speedX;
+  rotY += cfg.speedY;
+
+  const t = tick * 0.018;
+  const [cr, cg, cb] = cfg.pc;
+
+  const projected = pts.map(p => {
+    let { x, y, z } = rotate(p.ox, p.oy, p.oz, rotX, rotY);
+
+    // Listen: surface wave
+    if (cfg.distort > 0 && mode === 'listen') {
+      const wave = Math.sin(tick * 0.05 + p.phase) * cfg.distort * R;
+      const norm = Math.sqrt(x*x + y*y + z*z) || 1;
+      x += (x/norm) * wave;
+      y += (y/norm) * wave;
+      z += (z/norm) * wave;
+    }
+
+    // Think: fast swirl distortion
+    if (mode === 'think') {
+      const swirl = Math.sin(tick * 0.08 + p.phase) * 0.04 * R;
+      x += swirl * Math.cos(p.phase);
+      y += swirl * Math.sin(p.phase);
+    }
+
+    // Speak: organic blob morph using noise
+    if (cfg.morphAmp > 0) {
+      const norm = Math.sqrt(x*x + y*y + z*z) || 1;
+      const nx = x/norm, ny = y/norm, nz = z/norm;
+      const n = noise3(nx + p.nx, ny + p.ny, nz + p.nz, t);
+      const morphR = R * (1 + n * 0.35);
+      const scale2 = morphR / norm;
+      x *= scale2; y *= scale2; z *= scale2;
+    }
+
+    // Speak: subtle rhythmic pulse
+    if (cfg.pulseAmp > 0) {
+      const pulse = 1 + Math.sin(tick * cfg.pulseSpeed) * cfg.pulseAmp;
+      const ripple = 1 + Math.sin(tick * 0.34 + p.phase) * 0.018;
+      const finalScale = pulse * ripple;
+      x *= finalScale;
+      y *= finalScale;
+      z *= pulse;
+    }
+
+    const { px, py, scale } = project(x, y, z);
+    return { px, py, scale, size: p.size, o: p.o, z };
+  });
+
+  projected.sort((a, b) => a.z - b.z);
+
+  projected.forEach(p => {
+    const depth = (p.z + R * 1.4) / (R * 2.8);
+    const alpha = p.o * (0.1 + depth * 0.9);
+    const sz = p.size * p.scale * (0.3 + depth * 1.0);
+    octx.beginPath();
+    octx.arc(p.px, p.py, Math.max(sz, 0.2), 0, Math.PI * 2);
+    octx.fillStyle = `rgba(${cr},${cg},${cb},${Math.min(alpha,1).toFixed(2)})`;
+    octx.fill();
+  });
+
+  // Bright flash
+  if (Math.random() < 0.05) {
+    const ri = Math.floor(Math.random() * projected.length);
+    const p = projected[ri];
+    if (p) {
+      octx.beginPath();
+      octx.arc(p.px, p.py, p.size * 3, 0, Math.PI * 2);
+      octx.fillStyle = cfg.color;
+      octx.globalAlpha = 0.7;
+      octx.fill();
+      octx.globalAlpha = 1;
+    }
+  }
+
+  requestAnimationFrame(drawSphere);
+}
+
+function setMode(m, btn, silent) {
+  if (!MODES[m]) return;
+  if (m === mode && !btn) return;
+  const prev = mode;
+  mode = m;
+  const cfg = MODES[m];
+  document.getElementById('mlabel').style.color = cfg.color;
+  document.getElementById('mlabel').textContent = cfg.label;
+  document.getElementById('zname').style.color = cfg.color;
+  if (m === 'speak') triggerBurst(prev === 'speak' ? 0.45 : 1.1);
+  if (m !== 'speak') burstCooldown = 0;
+  if (!silent) addLog('MODE → ' + m.toUpperCase());
+}
+
+const CHAT_LIMIT = 100;
+const chatLines = [];
+const chatBox = document.getElementById('chat-log');
+const TYPEWRITER_MS = 2;
+let streamLine = null;
+let streamText = '';
+let streamPending = '';
+let streamTyping = false;
+let streamActive = false;
+
+function createChatLine(type, text) {
+  const t = (type || 'system').toLowerCase();
+  const lineType = (t === 'user' || t === 'zenith' || t === 'system' || t === 'error') ? t : 'system';
+  const line = document.createElement('div');
+  line.className = `chat-line chat-${lineType}`;
+  line.textContent = text || '';
+  chatBox.appendChild(line);
+  chatLines.push(line);
+
+  while (chatLines.length > CHAT_LIMIT) {
+    const oldest = chatLines.shift();
+    if (oldest && oldest.parentNode === chatBox) chatBox.removeChild(oldest);
+  }
+  return line;
+}
+
+function addChatLog(type, message) {
+  if (!chatBox || !message) return;
+  const lineType = (type || 'system').toLowerCase();
+
+  let prefix = '';
+  if (lineType === 'user') prefix = 'You: ';
+  else if (lineType === 'zenith') prefix = 'Zenith: ';
+
+  createChatLine(lineType, prefix + String(message));
+  requestAnimationFrame(() => {
+    chatBox.scrollTop = chatBox.scrollHeight;
+  });
+}
+
+function beginZenithStream() {
+  if (streamLine && streamPending.length > 0) {
+    streamText += streamPending;
+    streamPending = '';
+    streamLine.textContent = 'Zenith: ' + streamText;
+  }
+  streamLine = createChatLine('zenith', 'Zenith: ');
+  streamText = '';
+  streamPending = '';
+  streamActive = true;
+  requestAnimationFrame(() => {
+    chatBox.scrollTop = chatBox.scrollHeight;
+  });
+}
+
+function drainTypewriter() {
+  if (!streamLine || !streamPending.length) {
+    streamTyping = false;
+    return;
+  }
+  streamTyping = true;
+  streamText += streamPending.charAt(0);
+  streamPending = streamPending.slice(1);
+  streamLine.textContent = 'Zenith: ' + streamText;
+  chatBox.scrollTop = chatBox.scrollHeight;
+  setTimeout(drainTypewriter, TYPEWRITER_MS);
+}
+
+function appendZenithChunk(chunk) {
+  if (!chunk) return;
+  if (!streamActive || !streamLine) beginZenithStream();
+  streamPending += String(chunk);
+  if (!streamTyping) drainTypewriter();
+}
+
+function endZenithStream() {
+  streamActive = false;
+}
+
+const intentHist = new Array(20).fill(0.5);
+function drawIntentChart() {
+  const c = document.getElementById('chart-intent');
+  const cx = c.getContext('2d');
+  cx.clearRect(0,0,190,48);
+  cx.strokeStyle='#1a1a1a'; cx.lineWidth=0.5;
+  [0.25,0.5,0.75].forEach(y=>{ cx.beginPath();cx.moveTo(0,48*y);cx.lineTo(190,48*y);cx.stroke(); });
+  cx.beginPath();
+  intentHist.forEach((v,i)=>{ const x=(i/19)*190, y=48-v*48; i===0?cx.moveTo(x,y):cx.lineTo(x,y); });
+  cx.strokeStyle=MODES[mode].color; cx.lineWidth=1.5; cx.stroke();
+  cx.beginPath(); cx.arc(190, 48-intentHist[19]*48, 2.5, 0, Math.PI*2);
+  cx.fillStyle=MODES[mode].color; cx.fill();
+}
+
+function drawGauge(val) {
+  const c=document.getElementById('gauge');
+  const cx=c.getContext('2d');
+  cx.clearRect(0,0,120,70);
+  cx.beginPath(); cx.arc(60,65,48,Math.PI,2*Math.PI);
+  cx.strokeStyle='#1a1a1a'; cx.lineWidth=6; cx.stroke();
+  cx.beginPath(); cx.arc(60,65,48,Math.PI,Math.PI+Math.PI*val);
+  cx.strokeStyle=MODES[mode].color; cx.lineWidth=6; cx.lineCap='round'; cx.stroke();
+}
+
+const micCanvas = document.getElementById('mic-visualizer');
+const micCtx2d = micCanvas.getContext('2d');
+const micStatus = document.getElementById('mic-status');
+const MIC_BAR_COUNT = 24;
+let micAnalyser = null;
+let micData = null;
+
+function drawMicVisualizerFrame() {
+  const w = micCanvas.width;
+  const h = micCanvas.height;
+  const gap = 2;
+  const barW = Math.floor((w - gap * (MIC_BAR_COUNT - 1)) / MIC_BAR_COUNT);
+
+  micCtx2d.clearRect(0, 0, w, h);
+  micCtx2d.fillStyle = '#060606';
+  micCtx2d.fillRect(0, 0, w, h);
+
+  const levels = new Array(MIC_BAR_COUNT).fill(0.05);
+  if (micAnalyser && micData) {
+    micAnalyser.getByteFrequencyData(micData);
+    const step = Math.max(1, Math.floor(micData.length / MIC_BAR_COUNT));
+    for (let i = 0; i < MIC_BAR_COUNT; i++) {
+      let sum = 0;
+      for (let j = 0; j < step; j++) sum += micData[i * step + j] || 0;
+      levels[i] = Math.max(0.05, (sum / step) / 255);
+    }
+  }
+
+  const color = MODES[mode].color;
+  for (let i = 0; i < MIC_BAR_COUNT; i++) {
+    const energy = levels[i];
+    const minH = 3;
+    const maxH = h - 6;
+    const barH = Math.min(maxH, minH + energy * maxH * 1.25);
+    const x = i * (barW + gap);
+    const y = h - barH - 2;
+    micCtx2d.fillStyle = color;
+    micCtx2d.globalAlpha = 0.25 + Math.min(0.75, energy * 1.2);
+    micCtx2d.fillRect(x, y, barW, barH);
+    micCtx2d.globalAlpha = 1;
+  }
+
+  requestAnimationFrame(drawMicVisualizerFrame);
+}
+
+async function initMicVisualizer() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    micStatus.textContent = 'Microphone API unavailable';
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      video: false
+    });
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioCtx.createMediaStreamSource(stream);
+    micAnalyser = audioCtx.createAnalyser();
+    micAnalyser.fftSize = 256;
+    micAnalyser.smoothingTimeConstant = 0.82;
+    source.connect(micAnalyser);
+    micData = new Uint8Array(micAnalyser.frequencyBinCount);
+    micStatus.textContent = 'Live microphone input';
+  } catch (err) {
+    micStatus.textContent = 'Microphone blocked';
+  }
+}
+
+const logs=[];
+const sysLogs=['GROQ.API → CONNECTED','LLM → LLAMA3.2:3B','AB.FILTER → ACTIVE','MEMORY → LOADED','VOICE.STT → READY','INTENT → EXECUTION','INTENT → GENERAL','CONF → HIGH'];
+let logI=0;
+let backendOnline = true;
+let backendState = { mode: 'idle', status: '' };
+let backendEventCursor = 0;
+function addLog(msg) {
+  const t=new Date();
+  const ts=`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
+  logs.unshift(`[${ts}] ${msg}`);
+  if(logs.length>8)logs.pop();
+  document.getElementById('logbox').innerHTML=logs.map((l,i)=>`<div class="log-line ${i===0?'new':''}">${l}</div>`).join('');
+}
+
+async function syncFromBackend() {
+  try {
+    const res = await fetch('/api/state?_t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('Bad response');
+    const state = await res.json();
+
+    if (!backendOnline) {
+      backendOnline = true;
+      addLog('GUI LINK → ONLINE');
+    }
+
+    if (state.mode && state.mode !== backendState.mode) {
+      backendState.mode = state.mode;
+      setMode(state.mode, null, true);
+      addLog('MODE → ' + state.mode.toUpperCase());
+    }
+
+    if (state.status && state.status !== backendState.status) {
+      backendState.status = state.status;
+      addLog('STATE → ' + state.status);
+      addChatLog(/error|could not|fail|offline/i.test(state.status) ? 'error' : 'system', state.status);
+    }
+  } catch (err) {
+    if (backendOnline) {
+      backendOnline = false;
+      addLog('GUI LINK → OFFLINE');
+      addChatLog('error', 'GUI link offline');
+    }
+  }
+}
+
+async function syncEventsFromBackend() {
+  try {
+    const res = await fetch('/api/events?since=' + backendEventCursor + '&_t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('Bad response');
+    const data = await res.json();
+    const events = Array.isArray(data.events) ? data.events : [];
+    events.forEach((evt) => {
+      backendEventCursor = Math.max(backendEventCursor, Number(evt.id) || backendEventCursor);
+      const payload = evt.payload || {};
+      if (evt.type === 'user_message' && payload.text) addChatLog('user', payload.text);
+      else if (evt.type === 'assistant_stream_start') beginZenithStream();
+      else if (evt.type === 'assistant_stream_chunk') appendZenithChunk(payload.chunk || '');
+      else if (evt.type === 'assistant_stream_end') endZenithStream();
+      else if (evt.type === 'system_message' && payload.text) addChatLog('system', payload.text);
+      else if (evt.type === 'error_message' && payload.text) addChatLog('error', payload.text);
+    });
+  } catch (_) {
+    // State polling already handles link errors.
+  }
+}
+
+setInterval(()=>{
+  const cpu=15+Math.random()*40, ram=40+Math.random()*20;
+  const gpu=mode==='think'?60+Math.random()*30:20+Math.random()*25;
+  const vram=50+Math.random()*20;
+  document.getElementById('s-cpu').textContent=cpu.toFixed(0)+'%';
+  document.getElementById('b-cpu').style.width=cpu+'%';
+  document.getElementById('s-ram').textContent=ram.toFixed(0)+'%';
+  document.getElementById('b-ram').style.width=ram+'%';
+  document.getElementById('s-gpu').textContent=gpu.toFixed(0)+'%';
+  document.getElementById('b-gpu').style.width=gpu+'%';
+  document.getElementById('s-vram').textContent=vram.toFixed(0)+'%';
+  document.getElementById('b-vram').style.width=vram+'%';
+  const conf=0.75+Math.random()*0.24;
+  intentHist.push(conf); intentHist.shift();
+  drawIntentChart(); drawGauge(conf);
+  document.getElementById('conf-num').textContent=conf.toFixed(2);
+  document.getElementById('conf-num').style.color=MODES[mode].color;
+  if(Math.random()<0.35){addLog(sysLogs[logI%sysLogs.length]);logI++;}
+},1000);
+
+resizeParticleCanvas();
+initParticles();
+mkSphere();
+drawSphere();
+animateParticles();
+drawMicVisualizerFrame();
+initMicVisualizer();
+window.addEventListener('resize', () => {
+  resizeParticleCanvas();
+  syncParticleDensity();
+});
+addLog('ZENITH.BOOT → OK');
+addLog('SYS.INIT → COMPLETE');
+addChatLog('system', 'Zenith GUI online');
+setInterval(syncFromBackend, 700);
+setInterval(syncEventsFromBackend, 120);
+syncFromBackend();
+syncEventsFromBackend();
+</script>
